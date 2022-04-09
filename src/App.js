@@ -5,10 +5,16 @@ import { useEffect, useState } from  'react';
 import idl from "./idl.json"
 import { Connection, PublicKey, clusterApiUrl } from '@solana/web3.js';
 import { Program, Provider, web3 } from '@project-serum/anchor';
+import kp from './keypair.json'
 
 // WEB 3
 const {SystemProgram, Keypair}  = web3;
-let baseAccount = Keypair.generate();
+// let baseAccount = Keypair.generate();
+let arr = Object.values(kp._keypair.secretKey);
+console.log(arr)
+let secret = new Uint8Array(arr);
+console.log(secret)
+const baseAccount = Keypair.fromSecretKey(secret)
 const programID =  new PublicKey(idl.metadata.address);
 const network = clusterApiUrl('devnet');
 const opts = {
@@ -124,15 +130,40 @@ const App = () => {
     }
   };
 
-  const sendGif = (event) => {
+  const sendGif = async (event) => {
     event.preventDefault()
-    if(inputValue.length > 0){
-      setGifList([...gifList, inputValue])
-      setInputValue("")
-      return console.log("Gif link:", inputValue)
+    setLoading(true)
+    if (inputValue.length === 0) {
+      console.log("No gif link given!")
+      notification.error({message: "", description: "No gif link given"})
+      return
     }
 
-    console.log("Empty Input detected")
+      setInputValue("")
+      console.log("Gif link:", inputValue)
+    
+      try {
+          const provider = getProvider();
+          const program = new Program(idl, programID, provider);
+
+          await program.rpc.addGif(inputValue, {
+            accounts: {
+              baseAccount: baseAccount.publicKey,
+              user: provider.wallet.publicKey
+            }
+          })
+
+          console.log("GIF successfully sent to program", inputValue)
+
+          await getGifList();
+          notification.success({message: "", description: "GIF successfully sent to program"})
+      } catch (error) {
+        console.log("Error sending GIF:", error)
+        notification.error({message: "", description: "GIF successfully sent to program"})
+
+      }finally {
+        setLoading(false)
+      }
   }
 
 
@@ -159,12 +190,14 @@ const App = () => {
         <div className="connected-container">
           <form onSubmit={sendGif}>
             <input type="text" placeholder="Enter gif link!" onChange={onChangeInput} value={inputValue} />
-            <button type="submit" className="cta-button submit-gif-button">Submit</button>
+            <button disabled={loading} type="submit" className="cta-button submit-gif-button"> 
+              {loading && <i className="spinner-border spinner-border-sm"  > </i>} Submit
+            </button>
         </form>
           <div className="gif-grid">
             {gifList.map((gif, index) => (
               <div className="gif-item" key={index}>
-                <img src={gif} alt={gif} />
+                <img src={gif.gifLink} alt={gif} />
               </div>
             ))}
           </div>
