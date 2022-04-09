@@ -1,8 +1,12 @@
 .App {
-  height: 100vh;
+  /* height: 100vh; */
   background-color: #1a202c;
-  overflow: scroll;
+  /* overflow: scroll; */
   text-align: center;
+}
+
+body {
+  background-color: #1a202c;
 }
 
 .container {
@@ -69,7 +73,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  position: absolute;
+  /* position: absolute; */
   width: 100%;
   bottom: 0;
   left: 0;
