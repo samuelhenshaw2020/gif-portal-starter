@@ -2,6 +2,22 @@ import twitterLogo from './assets/twitter-logo.svg';
 import './App.css';
 import {notification} from "antd";
 import { useEffect, useState } from  'react';
+import idl from "./idl.json"
+import { Connection, PublicKey, clusterApiUrl } from '@solana/web3.js';
+import { Program, Provider, web3 } from '@project-serum/anchor';
+
+// WEB 3
+const {SystemProgram, Keypair}  = web3;
+let baseAccount = Keypair.generate();
+const programID =  new PublicKey(idl.metadata.address);
+const network = clusterApiUrl('devnet');
+const opts = {
+  preflightCommitment: "processed" //can be procedded | finalized
+}
+
+// WEB 3 Functions
+
+
 
 // Constants
 const TWITTER_HANDLE = 'HenshawSamuel';
@@ -18,10 +34,53 @@ const TEST_GIFS = [
 
 const App = () => {
 
+  // REACT STATE
   const [wallet, setWallet] = useState({isWallet: false, address: null})
   const [loading, setLoading] = useState(false)
   const [inputValue, setInputValue] = useState('');
   const [gifList, setGifList] = useState([]);
+
+  const getProvider = () => {
+    const connection = new Connection(network, opts.preflightCommitment);
+    const provider = new Provider(connection, window.solana, opts.preflightCommitment);
+    return provider
+  }
+  
+  const getGifList =  async () => {
+    try {
+      const provider = getProvider();
+      const program = new Program(idl, programID, provider)
+      const account = await program.account.baseAccount.fetch(baseAccount.publicKey);
+
+      console.log("Got the account", account)
+      setGifList(account.gifList)
+    } catch (error) {
+      console.log("Error in getGifList: ", error)
+      setGifList(null);
+    }
+  }
+
+  
+  const createGifAccount = async () => {
+    try {
+      const provider = getProvider();
+      const program = new Program(idl, programID, provider);
+     
+      await program.rpc.initialize({
+        accounts: {
+          baseAccount: baseAccount.publicKey,
+          user: provider.wallet.publicKey,
+          systemProgram: SystemProgram.programId,
+        },
+        signers: [baseAccount]
+      });
+      console.log("Created a new BaseAccount w/ address:", baseAccount.publicKey.toString())
+      await getGifList();
+  
+    } catch(error) {
+      console.log("Error creating BaseAccount account:", error)
+    }
+  }
 
   const checkIfWalletIsisWallet = async () => {
       try {
@@ -76,6 +135,8 @@ const App = () => {
     console.log("Empty Input detected")
   }
 
+
+
   const onChangeInput = (event) => {
     setInputValue(event.target.value)
   }
@@ -88,21 +149,29 @@ const App = () => {
   );
 
   const renderConnectedContainer = () => (
-    <div className="connected-container">
-      <form onSubmit={sendGif}>
-        <input type="text" placeholder="Enter gif link!" onChange={onChangeInput} value={inputValue} />
-        <button type="submit" className="cta-button submit-gif-button">Submit</button>
-    </form>
-      <div className="gif-grid">
-        {gifList.map((gif, index) => (
-          <div className="gif-item" key={index}>
-            <img src={gif} alt={gif} />
+    gifList == null ?
+        <div className="connected-container">
+          <button className="cta-button submit-gif-button" onClick={createGifAccount}>
+            Do One-Time Initialization For GIF Program Account
+          </button>
+        </div>
+    :
+        <div className="connected-container">
+          <form onSubmit={sendGif}>
+            <input type="text" placeholder="Enter gif link!" onChange={onChangeInput} value={inputValue} />
+            <button type="submit" className="cta-button submit-gif-button">Submit</button>
+        </form>
+          <div className="gif-grid">
+            {gifList.map((gif, index) => (
+              <div className="gif-item" key={index}>
+                <img src={gif} alt={gif} />
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-    </div>
-  );
+        </div>
+  )
 
+  
 
   useEffect(() => { 
     console.log("running");
@@ -122,7 +191,7 @@ const App = () => {
   useEffect(() => {
     if(wallet.address){
       console.log('Fetching GIF list...');
-      setGifList(TEST_GIFS);
+      getGifList()
     }
   }, [wallet.address])
 
